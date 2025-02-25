@@ -13,7 +13,7 @@ def ReadData(filename):
     return np.array(x_data), np.array(y_data)
 
 # Leer datos desde el archivo
-x, y = ReadData("Datos_Taller_2.txt")  # Archivo con valores de x e y en columnas
+x, y = ReadData("Datos_Taller_2_B.txt")  # Archivo con valores de x e y en columnas
 
 # a) Interpolación de Lagrange
 def lagrange_interpolation(x_data, y_data, x_interp):
