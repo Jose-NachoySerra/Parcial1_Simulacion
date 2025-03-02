@@ -15,68 +15,62 @@ def ReadData(filename):
 # Leer datos desde el archivo
 x, y = ReadData("Datos_Taller_2_B.txt")  # Archivo con valores de x e y en columnas
 
-# a) Interpolación de Lagrange
-def lagrange_interpolation(x_data, y_data, x_interp):
-    def basis(j, x_point):
-        term = [(x_point - x_data[m]) / (x_data[j] - x_data[m]) for m in range(len(x_data)) if m != j]
-        return np.prod(term, axis=0)
-    return sum(y_data[j] * basis(j, x_interp) for j in range(len(x_data)))
+def funcion_modelo(x, a0, a1, a2, modelo):
+    if modelo == 1:
+        return a0 - a1 * np.exp(-a2 * x)
+    elif modelo == 2:
+        return a0 * x - a1 * np.exp(-a2 * x)
+    elif modelo == 3:
+        return a0 * x**2 - a1 * np.exp(-a2 * x)
 
-x_interp = np.linspace(min(x), max(x), 100)
-y_interp = lagrange_interpolation(x, y, x_interp)
+def jacobiano(x, a0, a1, a2, modelo):
+    J = np.zeros((len(x), 3))
+    if modelo == 1:
+        J[:, 0] = 1  # Derivada respecto a a0
+        J[:, 1] = -np.exp(-a2 * x)  # Derivada respecto a a1
+        J[:, 2] = a1 * x * np.exp(-a2 * x)  # Derivada respecto a a2
+    elif modelo == 2:
+        J[:, 0] = x  # Derivada respecto a a0
+        J[:, 1] = -np.exp(-a2 * x)  # Derivada respecto a a1
+        J[:, 2] = a1 * x * np.exp(-a2 * x)  # Derivada respecto a a2
+    elif modelo == 3:
+        J[:, 0] = x**2  # Derivada respecto a a0
+        J[:, 1] = -np.exp(-a2 * x)  # Derivada respecto a a1
+        J[:, 2] = a1 * x * np.exp(-a2 * x)  # Derivada respecto a a2
+    return J
 
-plt.plot(x_interp, y_interp, label='Interpolación de Lagrange')
-plt.scatter(x, y, color='red', label='Datos')
-plt.legend()
-plt.show()
+def ajuste_regresion_no_lineal(x, y, modelo, a0_init=1, a1_init=1, a2_init=1, error_tol=0.01, max_iter=100):
+    a0, a1, a2 = a0_init, a1_init, a2_init
+    for _ in range(max_iter):
+        y_pred = funcion_modelo(x, a0, a1, a2, modelo)
+        error = y - y_pred
+        J = jacobiano(x, a0, a1, a2, modelo)
+        delta_a, _, _, _ = np.linalg.lstsq(J, error, rcond=None)
+        a0 += delta_a[0]
+        a1 += delta_a[1]
+        a2 += delta_a[2]
+        if np.linalg.norm(delta_a) < error_tol:
+            break
+    return a0, a1, a2
 
-# b) Splines cúbicos
-def cubic_spline_interpolation(x_data, y_data, x_interp):
-    p = Polynomial.fit(x_data, y_data, deg=min(len(x_data)-1, 3))
-    return p(x_interp)
 
-y_spline = cubic_spline_interpolation(x, y, x_interp)
+# Ajuste y graficación de los tres modelos
+modelos = [1, 2, 3]
+plt.figure(figsize=(12, 4))
 
-plt.plot(x_interp, y_spline, label='Interpolación cúbica')
-plt.scatter(x, y, color='red', label='Datos')
-plt.legend()
-plt.show()
 
-# c) Regresión lineal para polinomios de grado 1 a 4
-for degree in range(1, 5):
-    coeffs = np.polyfit(x, y, degree)
-    poly_func = np.poly1d(coeffs)
-    y_fit = poly_func(x_interp)
-    plt.plot(x_interp, y_fit, label=f'Polinomio grado {degree}')
+for i, modelo in enumerate(modelos, 1):
+    a0, a1, a2 = ajuste_regresion_no_lineal(x, y, modelo)
+    print(f'Modelo {modelo}: a0 = {a0:.4f}, a1 = {a1:.4f}, a2 = {a2:.4f}')
+    
+    plt.figure()
+    plt.scatter(x, y, label='Datos experimentales')
+    x_smooth = np.linspace(min(x), max(x), 100)
+    plt.plot(x_smooth, funcion_modelo(x_smooth, a0, a1, a2, modelo), 'r-', label=f'Modelo {modelo}')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.legend()
+    plt.title(f'Modelo {modelo}')
 
-plt.scatter(x, y, color='red', label='Datos')
-plt.legend()
-plt.show()
-
-# Transformación logarítmica y = a0 * x^a1 -> log(y) = log(a0) + a1 * log(x)
-x_log = np.log(x)
-y_log = np.log(y)
-coeffs_log = np.polyfit(x_log, y_log, 1)
-y_transformed = np.exp(coeffs_log[1]) * x_interp ** coeffs_log[0]
-
-plt.plot(x_interp, y_transformed, label='Transformación logarítmica')
-plt.scatter(x, y, color='red', label='Datos')
-plt.legend()
-plt.show()
-
-# d) Regresión no lineal con funciones dadas
-def model_1(x, a0, a1, a2):
-    return a0 - a1 * np.exp(-a2 * x)
-
-def model_2(x, a0, a1, a2):
-    return a0 * x - a1 * np.exp(-a2 * x)
-
-def model_3(x, a0, a1, a2):
-    return a0 * x**2 - a1 * np.exp(-a2 * x)
-
-plt.plot(x_interp, model_1(x_interp, 10, 5, 0.5), label='Modelo 1')
-plt.plot(x_interp, model_2(x_interp, 2, 5, 0.5), label='Modelo 2')
-plt.plot(x_interp, model_3(x_interp, 1, 5, 0.5), label='Modelo 3')
-plt.scatter(x, y, color='red', label='Datos')
-plt.legend()
+plt.tight_layout()
 plt.show()
